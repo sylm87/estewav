@@ -6,19 +6,17 @@
 # Autor: Christian Prieto Bustamante
 
 import wave
+import gnupg, os
 
+# constantes cifrado
+CIPHER_ON = 1 # cifrado activo
+CIPHER_OFF = 0 # cifrado inactivo
 
+# variables modificables a gusto
 jumpsData = 10 #Espacio de muestras del framerate para la toma de datos válidos
-numFraData = 1 #El dato (1 byte) se compone de la lectura de 1 framerate
-numFraCipher = 1 #Un framerate para configurar el cifrado
-numFraElemHead = 1 #cada elemento de la cabecera (para saber si se trata de un archivo generado por nosotros) ocupa un framerate
 numFraSize = 4 # 32bits para determinar cuantos bytes ocupa el fichero oculto
-
-# Constantes de cifrado
-cipherPskEnable = 1
-cipherDisable = 0
-
-header = ["S", "Y", "L", "M"] # 1 byte por cada caracter (tiene que coincidir con la cabecera con la que se ocultó el contenido)
+header = ["S", "Y", "L", "M"] # 1 byte por cada caracter (contra menos caracteres, más posibilidades de error por accidente)
+passphrase_cipher = "clavedecifrado" # clave de cifrado en caso de haberlo activado
 
 
 # DATOS DEL USUARIO:
@@ -81,14 +79,17 @@ listTamanio.reverse()
 print "Bytes tamaño reordenados: ", listTamanio
 
 desplazamiento = 0
-tamanio = bin(0 & 0xFF)[2:]
+tamanio = ""
 for i in range(numFraSize):
-	print tamanio
-	tamanio += bin(listTamanio[i] & 0xFF)[2:]
+	#tamanio += bin(listTamanio[i] & 0xFF)[2:]
+	listTamanio[i]>>desplazamiento
+	tamanio += bin(listTamanio[i] & 0xFF)[2:].zfill(8)
+	print "byte: ", bin(listTamanio[i])[2:].zfill(8)
 	desplazamiento += 8
 
 sizeFileHidden = int(tamanio, 2)
-print sizeFileHidden
+print "Bytes ocultos: ", sizeFileHidden
+
 
 bytesFileOculto = []
 indexDataHidden = 0
@@ -96,11 +97,22 @@ while indexDataHidden < sizeFileHidden:
 	bytesFileOculto.append(bytesFileAudioBase[indexSampleWav])
 	indexSampleWav += saltos
 	indexDataHidden += 1
+
+nameFileResult = "recuperado"
+if typeCipher == CIPHER_ON:
+	nameFileResult = "recuperado.cipher"
 	
-	
-ficheroRecuperado = open("recuperado", 'wb')
+ficheroRecuperado = open(nameFileResult, 'wb')
 newFileByteArray = bytearray(bytesFileOculto)
 ficheroRecuperado.write(newFileByteArray)
 ficheroRecuperado.close()
-	
+
+if typeCipher == CIPHER_ON:
+	gpg = gnupg.GPG(gnupghome='gnupg')
+	with open(nameFileResult, 'rb') as f:
+		status = gpg.decrypt_file(f, passphrase=passphrase_cipher, output='resultado')
+
+	print 'ok: ', status.ok
+	print 'status: ', status.status
+	print 'stderr: ', status.stderr
 	
